@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: movie-vibe
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 app.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false   # set this secret in the Render dashboard, not here
+      - key: TMDB_API_KEY
+        sync: false   # set this secret in the Render dashboard, not here

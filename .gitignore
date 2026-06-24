@@ -1,0 +1,15 @@
+# SECRETS — never commit these
+credentials.py
+credentials copy.py
+
+# python
+__pycache__/
+*.pyc
+
+# data artifacts / logs (not needed by the deployed app)
+*.pkl
+*.log
+scrape_cache.json
+vibe_graph_raw.json
+vibe_graph.json
+vibe_canonical_map.json
