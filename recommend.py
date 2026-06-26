@@ -22,6 +22,7 @@ import time
 
 import scrape  # _arctic_get, fetch_comments, client, MODEL — no scrape runs on import
 import streaming  # "where to watch" via TMDB
+import ratings  # Rotten Tomatoes + IMDb via OMDb
 
 client = scrape.client
 MODEL = scrape.MODEL
@@ -176,13 +177,24 @@ def recommend(user_request: str) -> dict | None:
                 movie["streaming"] = info["streaming"]
                 if info.get("year") and not movie.get("year"):
                     movie["year"] = info["year"]
+            r = ratings.ratings_for(movie["title"], movie.get("year"))
+            if r:
+                movie["rt"] = r.get("rt")
+                movie["imdb"] = r.get("imdb")
     return rec
 
 
 # ── pretty print ──────────────────────────────────────────────────────────────
 def show(rec: dict) -> None:
     tp = rec["top_pick"]
-    rating = f"   ★ {tp['tmdb_rating']}" if tp.get("tmdb_rating") else ""
+    bits = []
+    if tp.get("rt"):
+        bits.append(f"🍅 {tp['rt']}")
+    if tp.get("imdb"):
+        bits.append(f"IMDb {tp['imdb']}")
+    if not bits and tp.get("tmdb_rating"):
+        bits.append(f"★ {tp['tmdb_rating']}")
+    rating = ("   " + "  ".join(bits)) if bits else ""
     print("\n" + "─" * 60)
     print(f"  🎬  {tp['title']} ({tp.get('year', '—')}){rating}")
     if tp.get("overview"):

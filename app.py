@@ -79,8 +79,11 @@ PAGE = """<!doctype html>
   .pick { display:flex; gap:18px; }
   .pick-poster { width:104px; border-radius:10px; flex-shrink:0; background:#000; }
   .pick-body { flex:1; min-width:0; }
-  .rating { display:inline-block; background:rgba(232,183,92,.14); color:var(--accent);
-            font-size:12px; font-weight:600; padding:2px 8px; border-radius:6px; margin-left:8px; vertical-align:2px; }
+  .rating, .rt, .imdb { display:inline-block; font-size:12px; font-weight:600;
+            padding:2px 8px; border-radius:6px; margin-left:8px; vertical-align:2px; }
+  .rating { background:rgba(232,183,92,.14); color:var(--accent); }
+  .rt { background:rgba(250,100,80,.16); color:#fa6450; }
+  .imdb { background:rgba(245,197,24,.16); color:#f5c518; }
   .overview { color:var(--muted); font-size:13.5px; line-height:1.5; margin:8px 0 12px; }
   .runners { margin-top:24px; border-top:1px solid var(--line); padding-top:20px; }
   .runners h3 { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
@@ -147,11 +150,17 @@ function whereText(s){
   else if(s.buy&&s.buy.length) parts.push('buy on '+s.buy.slice(0,2).map(esc).join(', '));
   return parts.join(' · ');
 }
-function ratingBadge(r){ return r ? '<span class="rating">★ '+esc(r)+'</span>' : ''; }
+function ratingsHtml(m){
+  let h='';
+  if(m.rt) h+='<span class="rt">🍅 '+esc(m.rt)+'</span>';
+  if(m.imdb) h+='<span class="imdb">IMDb '+esc(m.imdb)+'</span>';
+  if(!m.rt && !m.imdb && m.tmdb_rating) h+='<span class="rating">★ '+esc(m.tmdb_rating)+'</span>';
+  return h;
+}
 function render(d){
   const tp=d.top_pick||{};
   const poster = tp.poster ? '<img class="pick-poster" src="'+esc(tp.poster)+'" alt="">' : '';
-  let body='<div class="pick-title">'+esc(tp.title)+' <span class="yr">'+esc(tp.year||'')+'</span>'+ratingBadge(tp.tmdb_rating)+'</div>';
+  let body='<div class="pick-title">'+esc(tp.title)+' <span class="yr">'+esc(tp.year||'')+'</span>'+ratingsHtml(tp)+'</div>';
   if(tp.overview) body+='<div class="overview">'+esc(tp.overview)+'</div>';
   body+='<div class="why">'+esc(tp.why)+'</div>';
   const tw=whereText(tp.streaming);
@@ -164,7 +173,7 @@ function render(d){
     ru.forEach(m=>{
       const badge=(m.mentions&&m.mentions>1)?'<span class="badge">'+m.mentions+' threads</span>':'';
       const rposter=m.poster?'<img class="ru-poster" src="'+esc(m.poster)+'" alt="">':'';
-      let rb='<div class="ru-title">'+esc(m.title)+' <span class="yr">'+esc(m.year||'')+'</span>'+badge+ratingBadge(m.tmdb_rating)+'</div>'
+      let rb='<div class="ru-title">'+esc(m.title)+' <span class="yr">'+esc(m.year||'')+'</span>'+badge+ratingsHtml(m)+'</div>'
             +'<div class="ru-why">'+esc(m.why)+'</div>';
       const mw=whereText(m.streaming); if(mw) rb+='<div class="ru-where">▸ '+mw+'</div>';
       html+='<div class="ru">'+rposter+'<div class="ru-body">'+rb+'</div></div>';
