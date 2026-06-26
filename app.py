@@ -88,9 +88,7 @@ PAGE = """<!doctype html>
   .runners { margin-top:24px; border-top:1px solid var(--line); padding-top:20px; }
   .runners h3 { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
                 color:var(--muted); margin:0 0 14px; font-weight:600; }
-  .ru { display:flex; gap:12px; margin-bottom:18px; }
-  .ru-poster { width:46px; border-radius:6px; flex-shrink:0; background:#000; }
-  .ru-body { flex:1; min-width:0; }
+  .ru { margin-bottom:18px; }
   .ru-title { font-weight:600; font-size:16px; }
   .ru-title .yr { color:var(--muted); font-weight:400; }
   .badge { display:inline-block; background:rgba(232,183,92,.14); color:var(--accent);
@@ -159,24 +157,22 @@ function ratingsHtml(m){
 }
 function render(d){
   const tp=d.top_pick||{};
-  const poster = tp.poster ? '<img class="pick-poster" src="'+esc(tp.poster)+'" alt="">' : '';
   let body='<div class="pick-title">'+esc(tp.title)+' <span class="yr">'+esc(tp.year||'')+'</span>'+ratingsHtml(tp)+'</div>';
   if(tp.overview) body+='<div class="overview">'+esc(tp.overview)+'</div>';
   body+='<div class="why">'+esc(tp.why)+'</div>';
   const tw=whereText(tp.streaming);
   if(tw){ const link=tp.streaming&&tp.streaming.link;
     body+='<div class="where">▸ '+tw+(link?' &nbsp;<a href="'+esc(link)+'" target="_blank">where to watch ↗</a>':'')+'</div>'; }
-  let html='<div class="pick-label">Top pick</div><div class="pick">'+poster+'<div class="pick-body">'+body+'</div></div>';
+  let html='<div class="pick-label">Top pick</div>'+body;
   const ru=d.runners_up||[];
   if(ru.length){
     html+='<div class="runners"><h3>also worth a look</h3>';
     ru.forEach(m=>{
       const badge=(m.mentions&&m.mentions>1)?'<span class="badge">'+m.mentions+' threads</span>':'';
-      const rposter=m.poster?'<img class="ru-poster" src="'+esc(m.poster)+'" alt="">':'';
       let rb='<div class="ru-title">'+esc(m.title)+' <span class="yr">'+esc(m.year||'')+'</span>'+badge+ratingsHtml(m)+'</div>'
             +'<div class="ru-why">'+esc(m.why)+'</div>';
       const mw=whereText(m.streaming); if(mw) rb+='<div class="ru-where">▸ '+mw+'</div>';
-      html+='<div class="ru">'+rposter+'<div class="ru-body">'+rb+'</div></div>';
+      html+='<div class="ru">'+rb+'</div>';
     });
     html+='</div>';
   }
