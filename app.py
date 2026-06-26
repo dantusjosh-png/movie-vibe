@@ -98,6 +98,11 @@ PAGE = """<!doctype html>
   .where a { color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(232,183,92,.4); }
   .ru-where { margin-top:4px; font-size:12.5px; color:var(--accent); opacity:.9; }
   .err { color:#e89a9a; }
+  .seen-btn { margin-top:14px; background:transparent; border:1px solid var(--line); color:var(--muted);
+              font-size:12px; padding:5px 12px; border-radius:999px; cursor:pointer; }
+  .seen-btn:hover { border-color:var(--accent); color:var(--text); }
+  .watched-bar { margin-top:18px; color:var(--muted); font-size:12.5px; }
+  .watched-bar a { color:var(--accent); }
   .foot { margin-top:40px; color:var(--muted); font-size:12px; line-height:1.6; }
 </style>
 </head>
@@ -113,6 +118,7 @@ PAGE = """<!doctype html>
   <div class="chips" id="chips"></div>
   <div class="status" id="status"></div>
   <div class="card" id="card"></div>
+  <div class="watched-bar" id="watchedBar"></div>
   <div class="foot">Recommendations are paraphrased from real Reddit discussions. Live search &amp; AI synthesis &mdash; gives a fresh answer for whatever you type.</div>
 </div>
 <script>
@@ -122,7 +128,17 @@ EXAMPLES.forEach(e => { const b=document.createElement('button'); b.className='c
   b.onclick=()=>{ document.getElementById('q').value=e; document.getElementById('f').requestSubmit(); }; chips.appendChild(b); });
 
 const f=document.getElementById('f'), q=document.getElementById('q'), go=document.getElementById('go'),
-      status=document.getElementById('status'), card=document.getElementById('card');
+      status=document.getElementById('status'), card=document.getElementById('card'),
+      watchedBar=document.getElementById('watchedBar');
+let lastResult=null;
+
+// watched list — saved in THIS browser only (localStorage)
+function getWatched(){ try { return JSON.parse(localStorage.getItem('watchedMovies')||'[]'); } catch(e){ return []; } }
+function isWatched(t){ return getWatched().includes((t||'').toLowerCase()); }
+function addWatched(t){ const w=getWatched(), k=(t||'').toLowerCase(); if(k && !w.includes(k)){ w.push(k); localStorage.setItem('watchedMovies', JSON.stringify(w)); } }
+function clearWatched(){ localStorage.removeItem('watchedMovies'); updateWatchedBar(); if(lastResult) render(lastResult); }
+function updateWatchedBar(){ const n=getWatched().length;
+  watchedBar.innerHTML = n ? ('✓ '+n+' marked as seen · <a href="#" id="clearWatched">clear list</a>') : ''; }
 
 f.onsubmit = async (ev) => {
   ev.preventDefault();
@@ -133,13 +149,15 @@ f.onsubmit = async (ev) => {
     const r = await fetch('/api/recommend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({request})});
     const data = await r.json();
     status.innerHTML='';
-    if (data.error){ card.style.display='block'; card.innerHTML='<div class="why err">'+data.error+'</div>'; }
+    if (data.error){ lastResult=null; card.style.display='block'; card.innerHTML='<div class="why err">'+data.error+'</div>'; }
     else render(data);
   } catch(e){ status.innerHTML='<span class="err">Something went wrong. Is the server still running?</span>'; }
   go.disabled=false;
 };
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+function seenBtn(t,label){ return '<button class="seen-btn" data-title="'+escAttr(t)+'">'+label+'</button>'; }
 function whereText(s){
   if(!s) return '';
   const parts=[];
@@ -156,15 +174,21 @@ function ratingsHtml(m){
   return h;
 }
 function render(d){
-  const tp=d.top_pick||{};
+  lastResult=d;
+  const all=[d.top_pick||{}].concat(d.runners_up||[]).filter(m=>m.title && !isWatched(m.title));
+  if(!all.length){
+    card.innerHTML='<div class="why">All of these are marked as seen — try another vibe!</div>';
+    card.style.display='block'; updateWatchedBar(); return;
+  }
+  const tp=all[0], ru=all.slice(1);
   let body='<div class="pick-title">'+esc(tp.title)+' <span class="yr">'+esc(tp.year||'')+'</span>'+ratingsHtml(tp)+'</div>';
   if(tp.overview) body+='<div class="overview">'+esc(tp.overview)+'</div>';
   body+='<div class="why">'+esc(tp.why)+'</div>';
   const tw=whereText(tp.streaming);
   if(tw){ const link=tp.streaming&&tp.streaming.link;
     body+='<div class="where">▸ '+tw+(link?' &nbsp;<a href="'+esc(link)+'" target="_blank">where to watch ↗</a>':'')+'</div>'; }
+  body+=seenBtn(tp.title,'✓ Seen it — hide from future');
   let html='<div class="pick-label">Top pick</div>'+body;
-  const ru=d.runners_up||[];
   if(ru.length){
     html+='<div class="runners"><h3>also worth a look</h3>';
     ru.forEach(m=>{
@@ -172,12 +196,23 @@ function render(d){
       let rb='<div class="ru-title">'+esc(m.title)+' <span class="yr">'+esc(m.year||'')+'</span>'+badge+ratingsHtml(m)+'</div>'
             +'<div class="ru-why">'+esc(m.why)+'</div>';
       const mw=whereText(m.streaming); if(mw) rb+='<div class="ru-where">▸ '+mw+'</div>';
+      rb+=seenBtn(m.title,'✓ Seen it');
       html+='<div class="ru">'+rb+'</div>';
     });
     html+='</div>';
   }
   card.innerHTML=html; card.style.display='block';
+  updateWatchedBar();
 }
+
+card.addEventListener('click', e=>{
+  const b=e.target.closest('.seen-btn'); if(!b) return;
+  addWatched(b.dataset.title); updateWatchedBar(); if(lastResult) render(lastResult);
+});
+watchedBar.addEventListener('click', e=>{
+  if(e.target.id==='clearWatched'){ e.preventDefault(); clearWatched(); }
+});
+updateWatchedBar();
 </script>
 </body>
 </html>"""
