@@ -51,14 +51,20 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 # ── arctic shift helpers ──────────────────────────────────────────────────────
-def _arctic_get(endpoint: str, params: dict) -> list[dict]:
+def _arctic_get(endpoint: str, params: dict, retries: int = 3) -> list[dict]:
     url = f"{ARCTIC}/{endpoint}?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        body = json.load(resp)
-    if body.get("error"):
-        raise RuntimeError(body["error"])
-    return body.get("data") or []
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.load(resp)
+            if body.get("error"):
+                raise RuntimeError(body["error"])
+            return body.get("data") or []
+        except Exception:
+            if attempt == retries - 1:
+                raise
+            time.sleep(1.5 * (attempt + 1))  # back off on throttle/transient errors
 
 
 def _is_request_post(post: dict) -> bool:

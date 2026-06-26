@@ -165,19 +165,29 @@ def recommend(user_request: str) -> dict | None:
     raw = msg.content[0].text.strip().replace("```json", "").replace("```", "").strip()
     rec = json.loads(raw)
 
-    # enrich every pick with "where to watch"
+    # enrich every pick with TMDB details: overview, poster, rating, where to watch
     for movie in [rec.get("top_pick", {})] + rec.get("runners_up", []):
         if movie.get("title"):
-            movie["streaming"] = streaming.streaming_for(movie["title"], movie.get("year"))
+            info = streaming.movie_info(movie["title"], movie.get("year"))
+            if info:
+                movie["overview"] = info["overview"]
+                movie["poster"] = info["poster"]
+                movie["tmdb_rating"] = info["tmdb_rating"]
+                movie["streaming"] = info["streaming"]
+                if info.get("year") and not movie.get("year"):
+                    movie["year"] = info["year"]
     return rec
 
 
 # ── pretty print ──────────────────────────────────────────────────────────────
 def show(rec: dict) -> None:
     tp = rec["top_pick"]
+    rating = f"   ★ {tp['tmdb_rating']}" if tp.get("tmdb_rating") else ""
     print("\n" + "─" * 60)
-    print(f"  🎬  {tp['title']} ({tp.get('year', '—')})")
-    print(f"      {tp['why']}")
+    print(f"  🎬  {tp['title']} ({tp.get('year', '—')}){rating}")
+    if tp.get("overview"):
+        print(f"      {tp['overview']}")
+    print(f"      → {tp['why']}")
     where = streaming.summary_line(tp.get("streaming"))
     if where:
         print(f"      ▸ {where}")

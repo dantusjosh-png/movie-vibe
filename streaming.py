@@ -17,6 +17,7 @@ from scrape import load_key  # env-first key loader (falls back to "credentials 
 TMDB_API_KEY = load_key("TMDB_API_KEY") or ""
 
 TMDB = "https://api.themoviedb.org/3"
+POSTER_BASE = "https://image.tmdb.org/t/p/w342"
 REGION = "US"
 _cache: dict = {}   # (title, year) -> result, so repeats in one run are free
 
@@ -45,10 +46,14 @@ def _get(path: str, params: dict) -> dict:
         return json.load(resp)
 
 
-def streaming_for(title: str, year=None, region: str = REGION) -> dict | None:
-    """Return {'flatrate': [...], 'rent': [...], 'buy': [...], 'link': '...'} or None.
+def movie_info(title: str, year=None, region: str = REGION) -> dict | None:
+    """Look a movie up on TMDB and return everything we show about it:
 
-    'flatrate' = included with a subscription (Netflix, Max, ...). 'rent'/'buy' = paid.
+    {overview, poster, tmdb_rating, year, streaming: {flatrate, rent, buy, link}}
+
+    'streaming.flatrate' = included with a subscription (Netflix, Max, ...);
+    'rent'/'buy' = paid. Returns None if the movie isn't found or no key is set.
+    One TMDB search + one providers call, cached per (title, year).
     """
     if not TMDB_API_KEY or not title:
         return None
@@ -56,29 +61,43 @@ def streaming_for(title: str, year=None, region: str = REGION) -> dict | None:
     if key in _cache:
         return _cache[key]
 
-    result = None
+    info = None
     try:
         params = {"query": title}
         if year:
             params["year"] = year
         hits = (_get("search/movie", params).get("results") or [])
         if hits:
-            movie_id = hits[0]["id"]
-            region_data = (_get(f"movie/{movie_id}/watch/providers", {})
+            m = hits[0]
+            region_data = (_get(f"movie/{m['id']}/watch/providers", {})
                            .get("results") or {}).get(region) or {}
-            out = {"link": region_data.get("link")}
+            streaming = {"link": region_data.get("link")}
             for kind in ("flatrate", "rent", "buy"):
                 names = _clean_providers([p["provider_name"] for p in region_data.get(kind, [])])
                 if names:
-                    out[kind] = names
-            # only return something if we actually found a provider
-            if any(k in out for k in ("flatrate", "rent", "buy")):
-                result = out
-    except Exception:
-        result = None
+                    streaming[kind] = names
+            if not any(k in streaming for k in ("flatrate", "rent", "buy")):
+                streaming = None
 
-    _cache[key] = result
-    return result
+            rating = m.get("vote_average")
+            info = {
+                "overview": m.get("overview") or "",
+                "poster": (POSTER_BASE + m["poster_path"]) if m.get("poster_path") else None,
+                "tmdb_rating": round(rating, 1) if rating else None,
+                "year": (m.get("release_date") or "")[:4] or year,
+                "streaming": streaming,
+            }
+    except Exception:
+        info = None
+
+    _cache[key] = info
+    return info
+
+
+def streaming_for(title: str, year=None) -> dict | None:
+    """Back-compat helper — just the streaming portion of movie_info()."""
+    info = movie_info(title, year)
+    return info.get("streaming") if info else None
 
 
 def summary_line(s: dict | None) -> str:
